@@ -1,0 +1,9 @@
+= URL Classpath Scanner
+
+This adds specific support for the URL Classpath Scanner. As we are not able to detect the paths of other scanners, they are not supported currently.
+
+Simply pass a URLClassLoader to the ClasspathScanner and it will give you back a series of resources. You can also register one or more listeners before
+you scan and they will be notified of all interested resources. The listener is the ResourceScanListener.
+
+
+Not finished.
