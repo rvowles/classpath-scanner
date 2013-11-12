@@ -1,12 +1,13 @@
 package com.bluetrainsoftware.classpathscanner;
 
+import java.io.File;
 import java.io.InputStream;
 import java.net.URL;
 import java.util.List;
 import java.util.jar.JarEntry;
 
 /**
- * @author: Richard Vowles - https://plus.google.com/+RichardVowles
+ * @author Richard Vowles - https://plus.google.com/+RichardVowles
  */
 public interface ResourceScanListener {
 	/*
@@ -27,12 +28,23 @@ public interface ResourceScanListener {
 	class Resource {
 		public final URL url;
 		public final JarEntry entry;
+		public final File file;
 		public final String resourceName;
 
 		public Resource(URL url, JarEntry entry, String resourceName) {
 			this.url = url;
-			this.entry = entry;
 			this.resourceName = resourceName;
+
+			this.entry = entry;
+			this.file = null;
+		}
+
+		public Resource(URL url, File file, String resourceName) {
+			this.url = url;
+			this.resourceName = resourceName;
+
+			this.entry = null;
+			this.file = file;
 		}
 	}
 
@@ -40,8 +52,8 @@ public interface ResourceScanListener {
 	/**
 	 * If true, this is an interesting jar, please tell me about the entries in it.
 	 *
-	 * @param url
-	 * @return jar is interesting
+	 * @param url the url of the resource
+	 * @return resource is interesting, please tell me more...
 	 */
 	boolean isInteresting(URL url);
 }

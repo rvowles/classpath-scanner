@@ -1,7 +1,6 @@
 package com.bluetrainsoftware.classpathscanner;
 
 import org.apache.commons.io.IOUtils;
-import org.junit.Assert;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,10 +11,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.net.URLClassLoader;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
 
@@ -91,25 +87,62 @@ public class ClasspathScannerTests {
 		assertEquals(2, cpResources.size());
 
 		for(ClasspathResource resource : cpResources) {
-			assertTrue(resource.getJarFile().equals(jarFile) || resource.getJarFile().equals(noBangFile));
+			assertTrue(resource.getClassesSource().equals(jarFile) || resource.getClassesSource().equals(noBangFile));
 
-			if (resource.getJarFile().equals(jarFile)) {
+			if (resource.getClassesSource().equals(jarFile)) {
 				assertEquals(2, resource.getJarOffsets().size());
 				Set<String> offsets = new HashSet<>();
 				for(ClasspathResource.OffsetListener cr: resource.getJarOffsets()) {
 					offsets.add(cr.jarOffset);
 				}
-				assertTrue(offsets.contains("/" + WEB_INF_CLASSES));
-				assertTrue(offsets.contains("/" + WEB_INF_MYCLASSES));
+				assertTrue(offsets.contains(WEB_INF_CLASSES));
+				assertTrue(offsets.contains(WEB_INF_MYCLASSES));
 			}
 		}
 
 		assertEquals(6, allResources.size());
 	}
 
+	class MutableInteger {
+		int count;
+	}
 	@Test
-	public void nonUrlClassPathLoader() {
+	public void bigClassLoader() {
+		ClasspathScanner cp = new ClasspathScanner();
 
+		final List<ResourceScanListener.Resource> allResources = new ArrayList<>();
+		final List<ResourceScanListener.Resource> noResources = Collections.emptyList();
+
+		final MutableInteger counter = new MutableInteger();
+
+		cp.registerResourceScanner(new ResourceScanListener() {
+			@Override
+			public List<Resource> resource(List<Resource> resources) throws Exception {
+//				for(Resource r : resources) {
+//					log.info("resource is {}:{}", r.url.toString(), r.resourceName);
+//				}
+
+				counter.count = counter.count + resources.size();
+
+				return noResources;
+			}
+
+			@Override
+			public void deliver(Resource desire, InputStream inputStream) {
+			}
+
+			@Override
+			public boolean isInteresting(URL url) {
+				return true;
+			}
+		});
+
+		long now = System.currentTimeMillis();
+		List<ClasspathResource> cpResources = cp.scan(getClass().getClassLoader());
+		log.info("Total time {}ms number {}", System.currentTimeMillis() - now, counter.count);
+		for(ClasspathResource resource : cpResources) {
+			log.info("Resource is {}", resource.getUrl().toString());
+		}
 	}
 
 	private static final String WEB_INF_CLASSES = "WEB-INF/classes/";

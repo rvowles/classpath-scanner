@@ -4,6 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.URL;
 import java.util.*;
@@ -15,6 +16,7 @@ import java.util.jar.JarFile;
  */
 public class ClasspathResource {
 	private final static Logger log = LoggerFactory.getLogger(ClasspathResource.class);
+	private static final int MAX_RESOURCES = 3000;
 
 	/**
 	 * The original resources.
@@ -24,12 +26,13 @@ public class ClasspathResource {
 	/**
 	 * The war/jar file that contains the actual files
 	 */
-	private final File jarFile;
+	private final File classesSource;
 
 	/**
 	 * Optimization step - there is only the null jar offset
 	 */
 	private boolean onlyNullJarOffset;
+
 
 	/**
 	 * Allows us to keep a track of who is interested in this classpath artifact
@@ -48,16 +51,16 @@ public class ClasspathResource {
 			onlyNullJarOffset = true;
 		}
 
-		for(ResourceScanListener listener : listeners) {
-		  try {
-			  for(OffsetListener offsetListener : jarOffsets) {
-				  if (listener.isInteresting(offsetListener.url)) {
-					  offsetListener.listeners.add(listener);
-				  }
-			  }
-		  } catch (Exception ex) {
-			  throw new RuntimeException("Failed to ask listener for interest " + listener.getClass().getName() + ": " + ex.getMessage(), ex);
-		  }
+		for (ResourceScanListener listener : listeners) {
+			try {
+				for (OffsetListener offsetListener : jarOffsets) {
+					if (listener.isInteresting(offsetListener.url)) {
+						offsetListener.listeners.add(listener);
+					}
+				}
+			} catch (Exception ex) {
+				throw new RuntimeException("Failed to ask listener for interest " + listener.getClass().getName() + ": " + ex.getMessage(), ex);
+			}
 		}
 	}
 
@@ -69,10 +72,78 @@ public class ClasspathResource {
 			return; // no-one is interested
 		}
 
-		List<ResourceScanListener.Resource> resources = new ArrayList<>(3000);
+		List<ResourceScanListener.Resource> resources = new ArrayList<>(MAX_RESOURCES);
+
+		if (classesSource.isDirectory()) {
+			OffsetListener listener = jarOffsets.iterator().next();
+
+			// only process if anyone is listening
+			if (listener.listeners.size() > 0) {
+				processDirectory(resources, classesSource, "", listener);
+
+				fireListeners(resources, listener);
+			}
+		} else {
+			processJarFile(resources);
+		}
+	}
+
+	protected void processDirectory(List<ResourceScanListener.Resource> resources, File dir, String packageName, OffsetListener listener) {
+		File[] files = dir.listFiles();
+
+		if (files != null) {
+			for (File file : files) {
+				if (file.isDirectory()) {
+					// as long as it isn't a "hidden" directory
+
+					if (!file.getName().startsWith(".")) {
+						String newPackageName = packageName;
+
+						if (packageName.length() > 0) {
+							newPackageName += ".";
+						}
+
+						processDirectory(resources, file, newPackageName + file.getName(), listener);
+					}
+				} else {
+					resources.add(new ResourceScanListener.Resource(url, file, packageName + file.getName()));
+
+					if (resources.size() >= MAX_RESOURCES) {
+						fireListeners(resources, listener);
+					}
+				}
+			}
+		}
+
+	}
+
+	private void fireListeners(List<ResourceScanListener.Resource> resources, OffsetListener offsetListener) {
+		if (resources.size() > 0) {
+
+			for (ResourceScanListener listener : offsetListener.listeners) {
+				try {
+					List<ResourceScanListener.Resource> desired = listener.resource(resources);
+
+					for (ResourceScanListener.Resource desire : desired) {
+						FileInputStream stream = new FileInputStream(desire.file);
+
+						listener.deliver(desire, stream);
+
+						stream.close();
+					}
+				} catch (Exception e) {
+					throw new RuntimeException("Unable to ask listener for resources", e);
+				}
+			}
+
+			resources.clear();
+		}
+	}
+
+	protected void processJarFile(List<ResourceScanListener.Resource> resources) {
 
 		try {
-			JarFile jf = new JarFile(jarFile);
+			JarFile jf = new JarFile(classesSource);
 
 			Enumeration<JarEntry> entries = jf.entries();
 
@@ -104,6 +175,8 @@ public class ClasspathResource {
 
 						offsetStrip = lastPrefix.length();
 					}
+				} else if (resources.size() >= MAX_RESOURCES) {
+					fireListeners(resources, offsetListener, jf);
 				}
 
 				if (thereAreListeners) {
@@ -123,11 +196,11 @@ public class ClasspathResource {
 	private void fireListeners(List<ResourceScanListener.Resource> resources, OffsetListener offsetListener, JarFile jf) {
 		if (resources.size() > 0) {
 
-			for(ResourceScanListener listener : offsetListener.listeners) {
+			for (ResourceScanListener listener : offsetListener.listeners) {
 				try {
 					List<ResourceScanListener.Resource> desired = listener.resource(resources);
 
-					for(ResourceScanListener.Resource desire : desired) {
+					for (ResourceScanListener.Resource desire : desired) {
 						listener.deliver(desire, jf.getInputStream(desire.entry));
 					}
 				} catch (Exception e) {
@@ -148,7 +221,7 @@ public class ClasspathResource {
 	private OffsetListener findOffsetListener(String name) {
 		OffsetListener emptyListener = null;
 
-		for(OffsetListener listener : jarOffsets) {
+		for (OffsetListener listener : jarOffsets) {
 			if (listener.jarOffset.length() == 0) {
 				emptyListener = listener;
 			} else if (name.startsWith(listener.jarOffset)) {
@@ -171,13 +244,13 @@ public class ClasspathResource {
 	}
 
 	/**
-	 * Used to store the offset(s) in the jarFile, there can be multiple offsets for
+	 * Used to store the offset(s) in the classesSource, there can be multiple offsets for
 	 * one single file in a URL Class Path (e.g. Bathe Booter/Plugin)
 	 */
 	private Set<OffsetListener> jarOffsets = new TreeSet<>();
 
 	public ClasspathResource(File jarFile, URL url) {
-		this.jarFile = jarFile;
+		this.classesSource = jarFile;
 		this.url = url;
 	}
 
@@ -185,8 +258,8 @@ public class ClasspathResource {
 		return url;
 	}
 
-	public File getJarFile() {
-		return jarFile;
+	public File getClassesSource() {
+		return classesSource;
 	}
 
 	public Set<OffsetListener> getJarOffsets() {
@@ -196,9 +269,13 @@ public class ClasspathResource {
 	public void addJarOffset(String offset, URL url) {
 		OffsetListener listener = new OffsetListener();
 
-		listener.jarOffset = offset;
+		listener.jarOffset = offset.startsWith("/") ? offset.substring(1) : offset;
 		listener.url = url;
 
 		jarOffsets.add(listener);
+	}
+
+	public boolean isTestClasspath() {
+		return (classesSource.isDirectory() && classesSource.getAbsolutePath().endsWith("target/test-classes"));
 	}
 }
