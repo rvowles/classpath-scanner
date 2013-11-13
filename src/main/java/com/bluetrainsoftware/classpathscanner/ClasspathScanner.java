@@ -40,6 +40,20 @@ public class ClasspathScanner {
 		}
 	}
 
+	public void cleanListeners() {
+		List<ResourceScanListener> found = new ArrayList<>();
+
+		for(ResourceScanListener res : listeners) {
+			if (res.removeListenerOnScanCompletion()) {
+				found.add(res);
+			}
+		}
+
+		for(ResourceScanListener res : found) {
+			removeListener(res);
+		}
+	}
+
 	public void askForInterest(List<ClasspathResource> resources) {
 		for(ClasspathResource resource : resources) {
 			resource.askListeners(listeners);
@@ -47,7 +61,7 @@ public class ClasspathScanner {
 	}
 
 	public List<ClasspathResource> scan(ClassLoader loader) {
-		if (!(loader instanceof URLClassLoader)) {
+		if (!URLClassLoader.class.isInstance(loader)) {
 			throw new RuntimeException("Attempted to scan without using a URL Class Loader");
 		}
 
@@ -72,11 +86,13 @@ public class ClasspathScanner {
 
 			cpResources = Collections.unmodifiableList(myResources);
 
-			askForInterest(cpResources);
-			fireResourceScannerListeners(cpResources);
-
 			resources.put(cp, cpResources);
 		}
+
+		askForInterest(cpResources);
+		fireResourceScannerListeners(cpResources);
+		cleanListeners();
+
 
 		return cpResources;
 	}
@@ -131,6 +147,16 @@ public class ClasspathScanner {
 			myResources.add(resource);
 		} else {
 			log.info("classpath scan: {} cannot be found", path);
+		}
+	}
+
+	public void removeListener(ResourceScanListener listener) {
+		listeners.remove(listener);
+
+		for(List<ClasspathResource> cpResources: resources.values()) {
+			for(ClasspathResource res : cpResources) {
+				res.removeListener(listener);
+			}
 		}
 	}
 }

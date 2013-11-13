@@ -1,5 +1,6 @@
 package com.bluetrainsoftware.classpathscanner;
 
+import junit.framework.Assert;
 import org.apache.commons.io.IOUtils;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -52,28 +53,33 @@ public class ClasspathScannerTests {
 
 		ClasspathScanner cp = new ClasspathScanner();
 
-		final List<ResourceScanListener.Resource> allResources = new ArrayList<>();
+		final List<ResourceScanListener.ScanResource> allScanResources = new ArrayList<>();
 
 
 		cp.registerResourceScanner(new ResourceScanListener() {
 			@Override
-			public List<Resource> resource(List<Resource> resources) throws Exception {
-				allResources.addAll(resources);
+			public List<ScanResource> resource(List<ScanResource> scanResources) throws Exception {
+				allScanResources.addAll(scanResources);
 
-				for(Resource r : resources) {
+				for(ScanResource r : scanResources) {
 					log.info("resource is {}:{}", r.url.toString(), r.resourceName);
 				}
 
-				return resources;
+				return scanResources;
 			}
 
 			@Override
-			public void deliver(Resource desire, InputStream inputStream) {
+			public void deliver(ScanResource desire, InputStream inputStream) {
 
 			}
 
 			@Override
 			public boolean isInteresting(URL url) {
+				return true;
+			}
+
+			@Override
+			public boolean removeListenerOnScanCompletion() {
 				return true;
 			}
 		});
@@ -100,7 +106,8 @@ public class ClasspathScannerTests {
 			}
 		}
 
-		assertEquals(6, allResources.size());
+		assertEquals("Should have found six classes", 6, allScanResources.size());
+		assertEquals("Should not have any listeners left", 0, cp.listeners.size());
 	}
 
 	class MutableInteger {
@@ -110,29 +117,31 @@ public class ClasspathScannerTests {
 	public void bigClassLoader() {
 		ClasspathScanner cp = new ClasspathScanner();
 
-		final List<ResourceScanListener.Resource> allResources = new ArrayList<>();
-		final List<ResourceScanListener.Resource> noResources = Collections.emptyList();
-
 		final MutableInteger counter = new MutableInteger();
 
 		cp.registerResourceScanner(new ResourceScanListener() {
 			@Override
-			public List<Resource> resource(List<Resource> resources) throws Exception {
+			public List<ScanResource> resource(List<ScanResource> scanResources) throws Exception {
 //				for(Resource r : resources) {
 //					log.info("resource is {}:{}", r.url.toString(), r.resourceName);
 //				}
 
-				counter.count = counter.count + resources.size();
+				counter.count = counter.count + scanResources.size();
 
-				return noResources;
+				return null;
 			}
 
 			@Override
-			public void deliver(Resource desire, InputStream inputStream) {
+			public void deliver(ScanResource desire, InputStream inputStream) {
 			}
 
 			@Override
 			public boolean isInteresting(URL url) {
+				return true;
+			}
+
+			@Override
+			public boolean removeListenerOnScanCompletion() {
 				return true;
 			}
 		});

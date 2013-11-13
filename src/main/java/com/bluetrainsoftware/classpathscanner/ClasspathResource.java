@@ -33,6 +33,23 @@ public class ClasspathResource {
 	 */
 	private boolean onlyNullJarOffset;
 
+	class OffsetListener implements Comparable<OffsetListener> {
+		public URL url;
+		public String jarOffset;
+		public Set<ResourceScanListener> listeners = new HashSet<>();
+
+		@Override
+		public int compareTo(OffsetListener o) {
+			return o.jarOffset.compareTo(jarOffset);
+		}
+	}
+
+	/**
+	 * Used to store the offset(s) in the classesSource, there can be multiple offsets for
+	 * one single file in a URL Class Path (e.g. Bathe Booter/Plugin)
+	 */
+	private Set<OffsetListener> jarOffsets = new TreeSet<>();
+
 
 	/**
 	 * Allows us to keep a track of who is interested in this classpath artifact
@@ -72,23 +89,25 @@ public class ClasspathResource {
 			return; // no-one is interested
 		}
 
-		List<ResourceScanListener.Resource> resources = new ArrayList<>(MAX_RESOURCES);
+		List<ResourceScanListener.ScanResource> scanResources = new ArrayList<>(MAX_RESOURCES);
 
 		if (classesSource.isDirectory()) {
 			OffsetListener listener = jarOffsets.iterator().next();
 
 			// only process if anyone is listening
 			if (listener.listeners.size() > 0) {
-				processDirectory(resources, classesSource, "", listener);
+				processDirectory(scanResources, classesSource, "", listener);
 
-				fireListeners(resources, listener);
+				fireListeners(scanResources, listener);
 			}
 		} else {
-			processJarFile(resources);
+			processJarFile(scanResources);
 		}
 	}
 
-	protected void processDirectory(List<ResourceScanListener.Resource> resources, File dir, String packageName, OffsetListener listener) {
+
+
+	protected void processDirectory(List<ResourceScanListener.ScanResource> scanResources, File dir, String packageName, OffsetListener listener) {
 		File[] files = dir.listFiles();
 
 		if (files != null) {
@@ -97,50 +116,58 @@ public class ClasspathResource {
 					// as long as it isn't a "hidden" directory
 
 					if (!file.getName().startsWith(".")) {
+						processFile(scanResources, packageName, listener, file); // jars and dirs need to be added as resources
+
 						String newPackageName = packageName;
 
 						if (packageName.length() > 0) {
-							newPackageName += ".";
+							newPackageName += "/";
 						}
 
-						processDirectory(resources, file, newPackageName + file.getName(), listener);
+						processDirectory(scanResources, file, newPackageName + file.getName(), listener);
 					}
 				} else {
-					resources.add(new ResourceScanListener.Resource(url, file, packageName + file.getName()));
-
-					if (resources.size() >= MAX_RESOURCES) {
-						fireListeners(resources, listener);
-					}
+					processFile(scanResources, packageName, listener, file);
 				}
 			}
 		}
 
 	}
 
-	private void fireListeners(List<ResourceScanListener.Resource> resources, OffsetListener offsetListener) {
-		if (resources.size() > 0) {
+	private void processFile(List<ResourceScanListener.ScanResource> scanResources, String packageName, OffsetListener listener, File file) {
+		scanResources.add(new ResourceScanListener.ScanResource(url, file, packageName + file.getName()));
+
+		if (scanResources.size() >= MAX_RESOURCES) {
+			fireListeners(scanResources, listener);
+		}
+	}
+
+	private void fireListeners(List<ResourceScanListener.ScanResource> scanResources, OffsetListener offsetListener) {
+		if (scanResources.size() > 0) {
 
 			for (ResourceScanListener listener : offsetListener.listeners) {
 				try {
-					List<ResourceScanListener.Resource> desired = listener.resource(resources);
+					List<ResourceScanListener.ScanResource> desired = listener.resource(scanResources);
 
-					for (ResourceScanListener.Resource desire : desired) {
-						FileInputStream stream = new FileInputStream(desire.file);
+					if (desired != null) {
+						for (ResourceScanListener.ScanResource desire : desired) {
+							FileInputStream stream = new FileInputStream(desire.file);
 
-						listener.deliver(desire, stream);
+							listener.deliver(desire, stream);
 
-						stream.close();
+							stream.close();
+						}
 					}
 				} catch (Exception e) {
 					throw new RuntimeException("Unable to ask listener for resources", e);
 				}
 			}
 
-			resources.clear();
+			scanResources.clear();
 		}
 	}
 
-	protected void processJarFile(List<ResourceScanListener.Resource> resources) {
+	protected void processJarFile(List<ResourceScanListener.ScanResource> scanResources) {
 
 		try {
 			JarFile jf = new JarFile(classesSource);
@@ -165,7 +192,7 @@ public class ClasspathResource {
 					OffsetListener newOffsetListener = findOffsetListener(entry.getName());
 
 					if (newOffsetListener != offsetListener) {
-						fireListeners(resources, offsetListener, jf);
+						fireListeners(scanResources, offsetListener, jf);
 
 						offsetListener = newOffsetListener;
 
@@ -175,17 +202,17 @@ public class ClasspathResource {
 
 						offsetStrip = lastPrefix.length();
 					}
-				} else if (resources.size() >= MAX_RESOURCES) {
-					fireListeners(resources, offsetListener, jf);
+				} else if (scanResources.size() >= MAX_RESOURCES) {
+					fireListeners(scanResources, offsetListener, jf);
 				}
 
 				if (thereAreListeners) {
-					resources.add(new ResourceScanListener.Resource(currentUrl, entry, offsetStrip > 0 ? entry.getName().substring(offsetStrip) : entry.getName()));
+					scanResources.add(new ResourceScanListener.ScanResource(currentUrl, entry, offsetStrip > 0 ? entry.getName().substring(offsetStrip) : entry.getName(), offsetListener.url));
 				}
 			}
 
 			// anything remaining
-			fireListeners(resources, offsetListener, jf);
+			fireListeners(scanResources, offsetListener, jf);
 
 			jf.close();
 		} catch (IOException e) {
@@ -193,22 +220,24 @@ public class ClasspathResource {
 		}
 	}
 
-	private void fireListeners(List<ResourceScanListener.Resource> resources, OffsetListener offsetListener, JarFile jf) {
-		if (resources.size() > 0) {
+	private void fireListeners(List<ResourceScanListener.ScanResource> scanResources, OffsetListener offsetListener, JarFile jf) {
+		if (scanResources.size() > 0) {
 
 			for (ResourceScanListener listener : offsetListener.listeners) {
 				try {
-					List<ResourceScanListener.Resource> desired = listener.resource(resources);
+					List<ResourceScanListener.ScanResource> desired = listener.resource(scanResources);
 
-					for (ResourceScanListener.Resource desire : desired) {
-						listener.deliver(desire, jf.getInputStream(desire.entry));
+					if (desired != null) {
+						for (ResourceScanListener.ScanResource desire : desired) {
+							listener.deliver(desire, jf.getInputStream(desire.entry));
+						}
 					}
 				} catch (Exception e) {
 					throw new RuntimeException("Unable to ask listener for resources", e);
 				}
 			}
 
-			resources.clear();
+			scanResources.clear();
 		}
 	}
 
@@ -232,22 +261,18 @@ public class ClasspathResource {
 		return emptyListener;
 	}
 
-	class OffsetListener implements Comparable<OffsetListener> {
-		public URL url;
-		public String jarOffset;
-		public Set<ResourceScanListener> listeners = new HashSet<>();
 
-		@Override
-		public int compareTo(OffsetListener o) {
-			return o.jarOffset.compareTo(jarOffset);
+	/**
+	 * Looks through any offsets and removes any matching listener that was registered.
+	 *
+	 * @param resourceListener
+	 */
+	public void removeListener(ResourceScanListener resourceListener) {
+		for (OffsetListener listener : jarOffsets) {
+			listener.listeners.remove(resourceListener);
 		}
 	}
 
-	/**
-	 * Used to store the offset(s) in the classesSource, there can be multiple offsets for
-	 * one single file in a URL Class Path (e.g. Bathe Booter/Plugin)
-	 */
-	private Set<OffsetListener> jarOffsets = new TreeSet<>();
 
 	public ClasspathResource(File jarFile, URL url) {
 		this.classesSource = jarFile;
