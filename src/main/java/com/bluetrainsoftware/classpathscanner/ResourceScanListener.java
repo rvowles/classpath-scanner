@@ -66,15 +66,8 @@ public interface ResourceScanListener {
 		public ScanResource(URL url, JarEntry entry, String resourceName, URL offsetUrl) {
 			this.url = url;
 			this.resourceName = resourceName;
-
 			this.entry = entry;
-
-			if (offsetUrl == url) {
-				this.offsetUrl = null;
-			} else {
-				this.offsetUrl = offsetUrl;
-			}
-
+			this.offsetUrl = offsetUrl;
 			this.file = null;
 		}
 
