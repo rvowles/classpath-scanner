@@ -33,10 +33,20 @@ public class ClasspathResource {
 	 */
 	private boolean onlyNullJarOffset;
 
+	class ListenerInterest {
+		final public ResourceScanListener listener;
+		final public ResourceScanListener.InterestAction action;
+
+		ListenerInterest(ResourceScanListener listener, ResourceScanListener.InterestAction action) {
+			this.listener = listener;
+			this.action = action;
+		}
+	}
+
 	class OffsetListener implements Comparable<OffsetListener> {
-		public URL url;
+		public ResourceScanListener.InterestingResource interestingResource;
 		public String jarOffset;
-		public Set<ResourceScanListener> listeners = new HashSet<>();
+		public List<ListenerInterest> listeners = new ArrayList<>();
 
 		@Override
 		public int compareTo(OffsetListener o) {
@@ -61,7 +71,7 @@ public class ClasspathResource {
 			OffsetListener offsetListener = new OffsetListener();
 
 			offsetListener.jarOffset = "";
-			offsetListener.url = url;
+			offsetListener.interestingResource = new ResourceScanListener.InterestingResource(url);
 
 			jarOffsets.add(offsetListener);
 
@@ -71,8 +81,10 @@ public class ClasspathResource {
 		for (ResourceScanListener listener : listeners) {
 			try {
 				for (OffsetListener offsetListener : jarOffsets) {
-					if (listener.isInteresting(offsetListener.url)) {
-						offsetListener.listeners.add(listener);
+					ResourceScanListener.InterestAction interestAction = listener.isInteresting(offsetListener.interestingResource);
+
+					if (interestAction != ResourceScanListener.InterestAction.NONE) {
+						offsetListener.listeners.add(new ListenerInterest(listener, interestAction));
 					}
 				}
 			} catch (Exception ex) {
@@ -98,7 +110,7 @@ public class ClasspathResource {
 			if (listener.listeners.size() > 0) {
 				processDirectory(scanResources, classesSource, "", listener);
 
-				fireListeners(scanResources, listener);
+				fireFileResourceListeners(scanResources, listener);
 			}
 		} else {
 			processJarFile(scanResources);
@@ -135,27 +147,29 @@ public class ClasspathResource {
 	}
 
 	private void processFile(List<ResourceScanListener.ScanResource> scanResources, String packageName, OffsetListener listener, File file) {
-		scanResources.add(new ResourceScanListener.ScanResource(url, file, packageName + file.getName()));
+		scanResources.add(new ResourceScanListener.ScanResource(url, file, packageName + "/" + file.getName()));
 
 		if (scanResources.size() >= MAX_RESOURCES) {
-			fireListeners(scanResources, listener);
+			fireFileResourceListeners(scanResources, listener);
 		}
 	}
 
-	private void fireListeners(List<ResourceScanListener.ScanResource> scanResources, OffsetListener offsetListener) {
+	private void fireFileResourceListeners(List<ResourceScanListener.ScanResource> scanResources, OffsetListener offsetListener) {
 		if (scanResources.size() > 0) {
 
-			for (ResourceScanListener listener : offsetListener.listeners) {
+			for (ListenerInterest interested : offsetListener.listeners) {
 				try {
-					List<ResourceScanListener.ScanResource> desired = listener.resource(scanResources);
+					List<ResourceScanListener.ScanResource> desired = interested.listener.resource(scanResources);
 
 					if (desired != null) {
 						for (ResourceScanListener.ScanResource desire : desired) {
-							FileInputStream stream = new FileInputStream(desire.file);
+							if (desire.file.isFile()) {
+								FileInputStream stream = new FileInputStream(desire.file);
 
-							listener.deliver(desire, stream);
+								interested.listener.deliver(desire, stream);
 
-							stream.close();
+								stream.close();
+							}
 						}
 					}
 				} catch (Exception e) {
@@ -207,7 +221,7 @@ public class ClasspathResource {
 				}
 
 				if (thereAreListeners) {
-					scanResources.add(new ResourceScanListener.ScanResource(currentUrl, entry, offsetStrip > 0 ? entry.getName().substring(offsetStrip) : entry.getName(), offsetListener.url));
+					scanResources.add(new ResourceScanListener.ScanResource(currentUrl, entry, offsetStrip > 0 ? entry.getName().substring(offsetStrip) : entry.getName(), offsetListener.interestingResource.url));
 				}
 			}
 
@@ -223,13 +237,13 @@ public class ClasspathResource {
 	private void fireListeners(List<ResourceScanListener.ScanResource> scanResources, OffsetListener offsetListener, JarFile jf) {
 		if (scanResources.size() > 0) {
 
-			for (ResourceScanListener listener : offsetListener.listeners) {
+			for (ListenerInterest interested : offsetListener.listeners) {
 				try {
-					List<ResourceScanListener.ScanResource> desired = listener.resource(scanResources);
+					List<ResourceScanListener.ScanResource> desired = interested.listener.resource(scanResources);
 
 					if (desired != null) {
 						for (ResourceScanListener.ScanResource desire : desired) {
-							listener.deliver(desire, jf.getInputStream(desire.entry));
+							interested.listener.deliver(desire, jf.getInputStream(desire.entry));
 						}
 					}
 				} catch (Exception e) {
@@ -263,13 +277,21 @@ public class ClasspathResource {
 
 
 	/**
-	 * Looks through any offsets and removes any matching listener that was registered.
-	 *
-	 * @param resourceListener
+	 * Looks through any offsets and removes any listeners that asked to listen to this
+	 * resource only once.
 	 */
-	public void removeListener(ResourceScanListener resourceListener) {
+	public void removeSingleFireListeners() {
 		for (OffsetListener listener : jarOffsets) {
-			listener.listeners.remove(resourceListener);
+			List<ListenerInterest> deleteds = new ArrayList<>();
+
+			// find all offset listeners that only want to be asked once
+			for(ListenerInterest check : listener.listeners) {
+				if (check.action == ResourceScanListener.InterestAction.ONCE) {
+					deleteds.add(check);
+				}
+			}
+
+			listener.listeners.removeAll(deleteds);
 		}
 	}
 
@@ -295,7 +317,7 @@ public class ClasspathResource {
 		OffsetListener listener = new OffsetListener();
 
 		listener.jarOffset = offset.startsWith("/") ? offset.substring(1) : offset;
-		listener.url = url;
+		listener.interestingResource = new ResourceScanListener.InterestingResource(url);
 
 		jarOffsets.add(listener);
 	}

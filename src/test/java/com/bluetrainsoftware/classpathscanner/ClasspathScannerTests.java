@@ -61,38 +61,32 @@ public class ClasspathScannerTests {
 			public List<ScanResource> resource(List<ScanResource> scanResources) throws Exception {
 				allScanResources.addAll(scanResources);
 
-				for(ScanResource r : scanResources) {
-					log.info("resource is {}:{}", r.url.toString(), r.resourceName);
-				}
+//				for(ScanResource r : scanResources) {
+//					log.info("resource is {}:{}", r.url.toString(), r.resourceName);
+//				}
 
-				return scanResources;
+				return null;
 			}
 
 			@Override
 			public void deliver(ScanResource desire, InputStream inputStream) {
-
 			}
 
 			@Override
-			public boolean isInteresting(URL url) {
-				return true;
-			}
-
-			@Override
-			public boolean removeListenerOnScanCompletion() {
-				return true;
+			public InterestAction isInteresting(InterestingResource interestingResource) {
+				return InterestAction.ONCE;
 			}
 		});
 
 		URLClassLoader loader = new URLClassLoader(all);
 		cp.scan(loader);
 
-		List<ClasspathResource> cpResources = ClasspathScanner.resources.get(loader);
+		ClasspathScanner.Classpath cpResources = ClasspathScanner.resources.get(loader);
 
 		assertNotNull(cpResources);
-		assertEquals(2, cpResources.size());
+		assertEquals(2, cpResources.classpaths.size());
 
-		for(ClasspathResource resource : cpResources) {
+		for(ClasspathResource resource : cpResources.classpaths) {
 			assertTrue(resource.getClassesSource().equals(jarFile) || resource.getClassesSource().equals(noBangFile));
 
 			if (resource.getClassesSource().equals(jarFile)) {
@@ -107,7 +101,8 @@ public class ClasspathScannerTests {
 		}
 
 		assertEquals("Should have found six classes", 6, allScanResources.size());
-		assertEquals("Should not have any listeners left", 0, cp.listeners.size());
+		assertEquals("Should always keep a track of one listener for new classpaths", 1, ClasspathScanner.allUncheckedListeners.size());
+		Assert.assertEquals("This classpath should have no listeners", 0, ClasspathScanner.resources.get(loader).uncheckedListeners.size());
 	}
 
 	class MutableInteger {
@@ -136,13 +131,8 @@ public class ClasspathScannerTests {
 			}
 
 			@Override
-			public boolean isInteresting(URL url) {
-				return true;
-			}
-
-			@Override
-			public boolean removeListenerOnScanCompletion() {
-				return true;
+			public InterestAction isInteresting(InterestingResource interestingResource) {
+				return InterestAction.ONCE;
 			}
 		});
 

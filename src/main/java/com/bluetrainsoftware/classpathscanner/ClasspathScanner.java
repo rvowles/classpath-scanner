@@ -22,50 +22,66 @@ public class ClasspathScanner {
 	/**
 	 * The resources from the last scan
 	 */
-	public static Map<URLClassLoader, List<ClasspathResource>> resources = new HashMap<>();
+	class Classpath {
+		final List<ClasspathResource> classpaths;
+		final List<ResourceScanListener> uncheckedListeners;
 
-	protected List<ResourceScanListener> listeners = new ArrayList<>();
+		public Classpath(List<ClasspathResource> classpaths) {
+			this.classpaths = Collections.unmodifiableList(classpaths);
+
+			this.uncheckedListeners = new ArrayList<>();
+			this.uncheckedListeners.addAll(allUncheckedListeners); // set it to the existing list
+		}
+
+		public void askForInterest() {
+			if (uncheckedListeners.size() > 0) {
+				for(ClasspathResource resource : classpaths) {
+					resource.askListeners(uncheckedListeners);
+				}
+			}
+
+			// clearing them allows us to all this over and over and not worry
+			uncheckedListeners.clear();
+		}
+
+		public void fireListeners() {
+			for(ClasspathResource resource : classpaths) {
+				resource.fireListeners();
+			}
+		}
+
+		public void cleanListeners() {
+			for(ClasspathResource resource : classpaths) {
+				resource.removeSingleFireListeners();
+			}
+		}
+	}
+
+	public static Map<URLClassLoader, Classpath> resources = new HashMap<>();
+	protected static List<ResourceScanListener> allUncheckedListeners = new ArrayList<>();
 
 	public static ClasspathScanner getInstance() {
 		return globalScanner;
 	}
 
 	public void registerResourceScanner(ResourceScanListener listener) {
-		listeners.add(listener);
-	}
-
-	public void fireResourceScannerListeners(List<ClasspathResource> resources) {
-		for(ClasspathResource resource : resources) {
-			resource.fireListeners();
-		}
-	}
-
-	public void cleanListeners() {
-		List<ResourceScanListener> found = new ArrayList<>();
-
-		for(ResourceScanListener res : listeners) {
-			if (res.removeListenerOnScanCompletion()) {
-				found.add(res);
-			}
+		for(Classpath cp : resources.values()) {
+			cp.uncheckedListeners.add(listener);
 		}
 
-		for(ResourceScanListener res : found) {
-			removeListener(res);
-		}
-	}
-
-	public void askForInterest(List<ClasspathResource> resources) {
-		for(ClasspathResource resource : resources) {
-			resource.askListeners(listeners);
-		}
+		allUncheckedListeners.add(listener);
 	}
 
 	public List<ClasspathResource> scan(ClassLoader loader) {
+		return scan(loader, true);
+	}
+
+	public List<ClasspathResource> scan(ClassLoader loader, boolean triggerNotification) {
 		if (!URLClassLoader.class.isInstance(loader)) {
 			throw new RuntimeException("Attempted to scan without using a URL Class Loader");
 		}
 
-		List<ClasspathResource> cpResources = resources.get(loader);
+		Classpath cpResources = resources.get((URLClassLoader)loader);
 		if (cpResources == null) {
 
 			Map<String, ClasspathResource> fileMap = new HashMap<>();
@@ -84,17 +100,18 @@ public class ClasspathScanner {
 				}
 			}
 
-			cpResources = Collections.unmodifiableList(myResources);
+			cpResources = new Classpath(myResources);
 
 			resources.put(cp, cpResources);
 		}
 
-		askForInterest(cpResources);
-		fireResourceScannerListeners(cpResources);
-		cleanListeners();
+		if (triggerNotification) {
+			cpResources.askForInterest();
+			cpResources.fireListeners();
+			cpResources.cleanListeners();
+		}
 
-
-		return cpResources;
+		return cpResources.classpaths;
 	}
 
 	private void processFileResource(String path, URL url, Map<String, ClasspathResource> fileMap, List<ClasspathResource> myResources) {
@@ -150,13 +167,4 @@ public class ClasspathScanner {
 		}
 	}
 
-	public void removeListener(ResourceScanListener listener) {
-		listeners.remove(listener);
-
-		for(List<ClasspathResource> cpResources: resources.values()) {
-			for(ClasspathResource res : cpResources) {
-				res.removeListener(listener);
-			}
-		}
-	}
 }

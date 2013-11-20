@@ -27,6 +27,12 @@ public interface ResourceScanListener {
 	 */
 	void deliver(ScanResource desire, InputStream inputStream);
 
+	enum InterestAction {
+		NONE, // not interesting
+		ONCE, // tell me once, delete me after that
+		REPEAT // tell me each time a scan happens but no more
+	}
+
 	class ScanResource {
 		/**
 		 * The URL of the directory or jar file
@@ -139,20 +145,46 @@ public interface ResourceScanListener {
 		}
 	}
 
+	/**
+	 * Holds a reference to the URL and the directory (if it exists).
+	 */
+	class InterestingResource {
+		/**
+		 * the Directory URL
+		 */
+		final public URL url;
+
+		/**
+		 * If it is a directory, this is the directory
+		 */
+		final public File directory;
+
+		public InterestingResource(URL url) {
+			this.url = url;
+
+			if (url.getPath().startsWith("file:")) {
+				File dir = new File(url.getPath().substring("file:".length()));
+				if (dir.isDirectory()) {
+					this.directory = dir;
+				} else {
+					this.directory = null;
+				}
+
+			} else {
+				directory = null;
+			}
+		}
+
+		public boolean isTestDirectory() {
+			return directory != null && directory.getPath().endsWith("/target/test-classes");
+		}
+	}
 
 	/**
 	 * If true, this is an interesting jar, please tell me about the entries in it.
 	 *
-	 * @param url the url of the resource, the jar file containing 1..x offsets or a directory
+	 * @param interestingResource each entry in the classpath gets checked for this
 	 * @return resource is interesting, please tell me more...
 	 */
-	boolean isInteresting(URL url);
-
-
-	/**
-	 * Remove this listener when the scan completes for this class loader?
-	 *
-	 * @return true to remove
-	 */
-	boolean removeListenerOnScanCompletion();
+	InterestAction isInteresting(InterestingResource interestingResource);
 }
