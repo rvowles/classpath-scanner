@@ -98,17 +98,15 @@ public interface ResourceScanListener {
 				} catch (MalformedURLException e) {
 					throw new RuntimeException("Failed to convert file to URL " + file.getAbsolutePath(), e);
 				}
-			} else if (offsetUrl != null) {
-				try {
-					finalUrl = new URL( offsetUrl.toString() + resourceName.substring(1));
-				} catch (MalformedURLException e) {
-					throw new RuntimeException("Failed to convert url to offset URL " + offsetUrl.toString(), e);
-				}
 			} else {
 				try {
-					finalUrl = new URL(url.toString() + resourceName.substring(1));
+					String u = offsetUrl.toString();
+					if (!u.contains("!/"))
+						u = "jar:" + u + "!";
+
+					finalUrl = new URL(u + "/" + resourceName);
 				} catch (MalformedURLException e) {
-					throw new RuntimeException("Failed to convert url to offset URL " + url.toString(), e);
+					throw new RuntimeException("Failed to convert url to offset URL " + offsetUrl.toString(), e);
 				}
 			}
 
@@ -124,6 +122,10 @@ public interface ResourceScanListener {
 		 */
 		public URL newOffset(String offset) {
 			String newUrl = offsetUrl.toString();
+
+			if (!newUrl.contains("!/")) {
+				newUrl = "jar:" + newUrl + "!";
+			}
 
 			if (!newUrl.endsWith("/")) {
 				newUrl += "/";
