@@ -55,6 +55,32 @@ public class ClasspathScanner {
 				resource.removeSingleFireListeners();
 			}
 		}
+
+		public void triggerNotifications() {
+			Set<ResourceScanListener> listeners = new HashSet<>();
+
+			for(ClasspathResource resource : classpaths) {
+				resource.collectInUseListeners(listeners);
+			}
+
+			listeners.addAll(uncheckedListeners);
+
+			notifyAction(listeners, ResourceScanListener.ScanAction.STARTING);
+
+			askForInterest();
+			fireListeners();
+
+			cleanListeners();
+
+			notifyAction(listeners, ResourceScanListener.ScanAction.COMPLETE);
+
+		}
+
+		private void notifyAction(Set<ResourceScanListener> listeners, ResourceScanListener.ScanAction action) {
+			for(ResourceScanListener listener : listeners) {
+				listener.scanAction(action);
+			}
+		}
 	}
 
 	public static Map<URLClassLoader, Classpath> resources = new HashMap<>();
@@ -106,9 +132,7 @@ public class ClasspathScanner {
 		}
 
 		if (triggerNotification) {
-			cpResources.askForInterest();
-			cpResources.fireListeners();
-			cpResources.cleanListeners();
+			cpResources.triggerNotifications();
 		}
 
 		return cpResources.classpaths;

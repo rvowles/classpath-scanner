@@ -26,6 +26,16 @@ import static org.junit.Assert.assertTrue;
 public class ClasspathScannerTests {
 	Logger log = LoggerFactory.getLogger(getClass());
 
+	protected void action(Map<ResourceScanListener.ScanAction, Integer> scanChecker, ResourceScanListener.ScanAction action) {
+		Integer counter = scanChecker.get(action);
+
+		if (counter == null) {
+			scanChecker.put(action, 1);
+		} else {
+			scanChecker.put(action, counter + 1);
+		}
+	}
+
 	@Test
 	public void cpTest() throws IOException {
 		File jarFile = File.createTempFile("bang", ".war");
@@ -55,6 +65,7 @@ public class ClasspathScannerTests {
 
 		final List<ResourceScanListener.ScanResource> allScanResources = new ArrayList<>();
 
+		final Map<ResourceScanListener.ScanAction, Integer> scanChecker = new HashMap<>();
 
 		cp.registerResourceScanner(new ResourceScanListener() {
 			@Override
@@ -76,9 +87,17 @@ public class ClasspathScannerTests {
 			public InterestAction isInteresting(InterestingResource interestingResource) {
 				return InterestAction.ONCE;
 			}
+
+			@Override
+			public void scanAction(ScanAction action) {
+				action(scanChecker, action);
+			}
 		});
 
 		URLClassLoader loader = new URLClassLoader(all);
+
+		cp.scan(loader); // we should only be called once
+		cp.scan(loader);
 		cp.scan(loader);
 
 		ClasspathScanner.Classpath cpResources = ClasspathScanner.resources.get(loader);
@@ -103,6 +122,9 @@ public class ClasspathScannerTests {
 		assertEquals("Should have found six classes", 6, allScanResources.size());
 		assertEquals("Should always keep a track of one listener for new classpaths", 1, ClasspathScanner.allUncheckedListeners.size());
 		Assert.assertEquals("This classpath should have no listeners", 0, ClasspathScanner.resources.get(loader).uncheckedListeners.size());
+		assertEquals("Should have two scan actions", 2, scanChecker.size());
+		assertEquals("Should have 1 start action1", 1, scanChecker.get(ResourceScanListener.ScanAction.STARTING).intValue());
+		assertEquals("Should have 1 complete action1", 1, scanChecker.get(ResourceScanListener.ScanAction.COMPLETE).intValue());
 	}
 
 	class MutableInteger {
@@ -133,6 +155,10 @@ public class ClasspathScannerTests {
 			@Override
 			public InterestAction isInteresting(InterestingResource interestingResource) {
 				return InterestAction.ONCE;
+			}
+
+			@Override
+			public void scanAction(ScanAction action) {
 			}
 		});
 

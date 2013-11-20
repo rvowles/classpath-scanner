@@ -33,6 +33,11 @@ public interface ResourceScanListener {
 		REPEAT // tell me each time a scan happens but no more
 	}
 
+	enum ScanAction {
+		STARTING, // about to scan
+		COMPLETE  // completed
+	}
+
 	class ScanResource {
 		/**
 		 * The URL of the directory or jar file
@@ -187,4 +192,6 @@ public interface ResourceScanListener {
 	 * @return resource is interesting, please tell me more...
 	 */
 	InterestAction isInteresting(InterestingResource interestingResource);
+
+	void scanAction(ScanAction action);
 }

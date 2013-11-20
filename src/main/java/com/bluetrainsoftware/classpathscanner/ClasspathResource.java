@@ -33,6 +33,7 @@ public class ClasspathResource {
 	 */
 	private boolean onlyNullJarOffset;
 
+
 	class ListenerInterest {
 		final public ResourceScanListener listener;
 		final public ResourceScanListener.InterestAction action;
@@ -295,6 +296,19 @@ public class ClasspathResource {
 		}
 	}
 
+	/**
+	 * This is used to collect all of the unique listeners that will be triggered by the next CP scan. It allows us
+	 * to notify them.
+	 *
+	 * @param listeners
+	 */
+	public void collectInUseListeners(Set<ResourceScanListener> listeners) {
+		for(OffsetListener ol : jarOffsets) {
+			for(ListenerInterest li : ol.listeners) {
+				listeners.add(li.listener);
+			}
+		}
+	}
 
 	public ClasspathResource(File jarFile, URL url) {
 		this.classesSource = jarFile;
