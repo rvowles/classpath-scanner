@@ -222,7 +222,7 @@ public class ClasspathResource {
 				}
 
 				if (thereAreListeners) {
-					scanResources.add(new ResourceScanListener.ScanResource(currentUrl, entry, offsetStrip > 0 ? entry.getName().substring(offsetStrip) : entry.getName(), offsetListener.interestingResource.url));
+					scanResources.add(new ResourceScanListener.ScanResource(currentUrl, entry, resourceName(offsetStrip, entry.getName()), offsetListener.interestingResource.url));
 				}
 			}
 
@@ -233,6 +233,18 @@ public class ClasspathResource {
 		} catch (IOException e) {
 			throw new RuntimeException("Failed to process jar file " + url.toString(), e);
 		}
+	}
+
+	private String resourceName(int offsetStrip, String name) {
+		if (offsetStrip > 0) {
+			name = name.substring(offsetStrip);
+		}
+
+		if (name.endsWith("/")) {
+			name = name.substring(0, name.length() - 1);
+		}
+
+		return name;
 	}
 
 	private void fireListeners(List<ResourceScanListener.ScanResource> scanResources, OffsetListener offsetListener, JarFile jf) {
