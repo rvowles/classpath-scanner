@@ -8,7 +8,7 @@
   </parent>
   <groupId>com.bluetrainsoftware</groupId>
   <artifactId>classpath-scanner</artifactId>
-  <version>1.2-SNAPSHOT</version>
+  <version>1.2</version>
   <packaging>jar</packaging>
   <name>Simple classpath scanner</name>
   <description>Provides an efficient classpath scanner for URLClassLoaders.</description>
@@ -16,7 +16,7 @@
     <connection>scm:git:git@github.com:rvowles/classpath-scanner</connection>
     <developerConnection>scm:git:git@github.com:rvowles/classpath-scanner</developerConnection>
     <url>http://github.com/rvowles/classpath-scanner</url>
-    <tag>HEAD</tag>
+    <tag>classpath-scanner-1.2</tag>
   </scm>
   <dependencies>
     <dependency>
