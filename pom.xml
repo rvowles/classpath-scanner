@@ -12,8 +12,13 @@
   <packaging>jar</packaging>
   <name>Simple classpath scanner</name>
   <description>Provides an efficient classpath scanner for URLClassLoaders.</description>
+  <scm>
+    <connection>scm:git:git@github.com:rvowles/classpath-scanner</connection>
+    <developerConnection>scm:git:git@github.com:rvowles/classpath-scanner</developerConnection>
+    <url>http://github.com/rvowles/classpath-scanner</url>
+    <tag>HEAD</tag>
+  </scm>
   <dependencies>
-
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>
@@ -40,4 +45,3 @@
     </dependency>
   </dependencies>
 </project>
-
