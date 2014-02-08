@@ -104,7 +104,7 @@ public interface ResourceScanListener {
 					if (!u.contains("!/"))
 						u = "jar:" + u + "!";
 
-					finalUrl = new URL(u + "/" + resourceName);
+					finalUrl = new URL(u + (u.endsWith("/")?"":"/") + resourceName);
 				} catch (MalformedURLException e) {
 					throw new RuntimeException("Failed to convert url to offset URL " + offsetUrl.toString(), e);
 				}

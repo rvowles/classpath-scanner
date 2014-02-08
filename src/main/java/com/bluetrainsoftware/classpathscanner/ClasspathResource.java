@@ -197,7 +197,7 @@ public class ClasspathResource {
 
 			if (onlyNullJarOffset) {
 				offsetListener = jarOffsets.iterator().next();
-				thereAreListeners = offsetListener.listeners.size() > 0;
+				thereAreListeners = offsetListener.listeners != null && offsetListener.listeners.size() > 0;
 			}
 
 			while (entries.hasMoreElements()) {
@@ -211,12 +211,19 @@ public class ClasspathResource {
 
 						offsetListener = newOffsetListener;
 
-						thereAreListeners = offsetListener.listeners.size() > 0;
+						thereAreListeners = offsetListener != null && offsetListener.listeners != null && offsetListener.listeners.size() > 0;
 
-						lastPrefix = offsetListener.jarOffset;
+						if (offsetListener == null) {
+							lastPrefix = "";
 
-						offsetStrip = lastPrefix.length();
+							offsetStrip = 0;
+						} else { // files from the main war popping up at the end
+							lastPrefix = offsetListener.jarOffset;
+
+							offsetStrip = lastPrefix.length();
+						}
 					}
+
 				} else if (scanResources.size() >= MAX_RESOURCES) {
 					fireListeners(scanResources, offsetListener, jf);
 				}
