@@ -8,7 +8,7 @@
   </parent>
   <groupId>com.bluetrainsoftware</groupId>
   <artifactId>classpath-scanner</artifactId>
-  <version>1.4-SNAPSHOT</version>
+  <version>1.3-SNAPSHOT</version>
   <packaging>jar</packaging>
   <name>Simple classpath scanner</name>
   <description>Provides an efficient classpath scanner for URLClassLoaders.</description>
