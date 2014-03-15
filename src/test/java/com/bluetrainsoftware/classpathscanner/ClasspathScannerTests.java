@@ -38,6 +38,8 @@ public class ClasspathScannerTests {
 
 	@Test
 	public void cpTest() throws IOException {
+		ClasspathScanner.resetScannerForTesting();
+
 		File jarFile = File.createTempFile("bang", ".war");
 
 		URL[] bangUrls =
@@ -132,6 +134,7 @@ public class ClasspathScannerTests {
 	}
 	@Test
 	public void bigClassLoader() {
+		ClasspathScanner.resetScannerForTesting();
 		ClasspathScanner cp = new ClasspathScanner();
 
 		final MutableInteger counter = new MutableInteger();

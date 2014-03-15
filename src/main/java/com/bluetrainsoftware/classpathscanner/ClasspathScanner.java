@@ -90,6 +90,12 @@ public class ClasspathScanner {
 		return globalScanner;
 	}
 
+	public static void resetScannerForTesting() {
+		globalScanner = new ClasspathScanner();
+		allUncheckedListeners = new ArrayList<>();
+		resources = new HashMap<>();
+	}
+
 	public void registerResourceScanner(ResourceScanListener listener) {
 		for(Classpath cp : resources.values()) {
 			cp.uncheckedListeners.add(listener);
