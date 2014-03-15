@@ -197,4 +197,21 @@ public class ClasspathScanner {
 		}
 	}
 
+	/**
+	 * looks through all of the classpaths we have and finds the one that ends in target/test-classes - if it finds it, it returns its parent.
+	 *
+	 * @return - the base directory of the application currently running (if any)
+	 */
+
+	public static File findTestClassesBasePath() {
+		for(Classpath cp : resources.values()) {
+			for(ClasspathResource cr : cp.classpaths) {
+				if (cr.isTestClasspath()) {
+					return cr.getClassesSource().getParentFile().getParentFile();
+				}
+			}
+		}
+
+		return null;
+	}
 }

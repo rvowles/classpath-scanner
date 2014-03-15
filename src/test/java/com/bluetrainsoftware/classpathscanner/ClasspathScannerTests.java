@@ -133,7 +133,7 @@ public class ClasspathScannerTests {
 		int count;
 	}
 	@Test
-	public void bigClassLoader() {
+	public void bigClassLoader()  {
 		ClasspathScanner.resetScannerForTesting();
 		ClasspathScanner cp = new ClasspathScanner();
 

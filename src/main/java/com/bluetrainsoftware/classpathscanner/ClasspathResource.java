@@ -98,7 +98,7 @@ public class ClasspathResource {
 	 * Spelunks through the classpath looking for the resources
 	 */
 	public void fireListeners() {
-		if (jarOffsets.size() == 1 && jarOffsets.iterator().next().listeners.size() == 0) {
+		if (jarOffsets.size() == 0 || (jarOffsets.size() == 1 && jarOffsets.iterator().next().listeners.size() == 0)) {
 			return; // no-one is interested
 		}
 
