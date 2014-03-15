@@ -162,8 +162,8 @@ public interface ResourceScanListener {
 		public InterestingResource(URL url) {
 			this.url = url;
 
-			if (url.getPath().startsWith("file:")) {
-				File dir = new File(url.getPath().substring("file:".length()));
+			if ("file".equals(url.getProtocol())) {
+				File dir = new File(url.getPath());
 				if (dir.isDirectory()) {
 					this.directory = dir;
 				} else {
