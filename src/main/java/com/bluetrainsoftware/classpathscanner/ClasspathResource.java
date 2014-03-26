@@ -367,6 +367,6 @@ public class ClasspathResource {
 	}
 
 	public boolean isTestClasspath() {
-		return (classesSource.isDirectory() && classesSource.getAbsolutePath().endsWith("target/test-classes"));
+		return (classesSource.isDirectory() && classesSource.getAbsolutePath().endsWith(String.format("target%stest-classes", File.separator)));
 	}
 }
