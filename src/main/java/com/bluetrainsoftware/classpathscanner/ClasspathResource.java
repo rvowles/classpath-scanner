@@ -183,10 +183,17 @@ public class ClasspathResource {
 	}
 
 	protected void processJarFile(List<ResourceScanListener.ScanResource> scanResources) {
+		JarFile jf = null;
 
 		try {
-			JarFile jf = new JarFile(classesSource);
+			jf = new JarFile(classesSource);
+		} catch (IOException e) {
+			log.error("You have a non jar-file resource on your classpath {}", classesSource.getAbsolutePath());
 
+			return;
+		}
+
+		try {
 			Enumeration<JarEntry> entries = jf.entries();
 
 			String lastPrefix = "";
@@ -236,9 +243,13 @@ public class ClasspathResource {
 			// anything remaining
 			fireListeners(scanResources, offsetListener, jf);
 
-			jf.close();
-		} catch (IOException e) {
-			throw new RuntimeException("Failed to process jar file " + url.toString(), e);
+
+		} finally {
+			try {
+				jf.close();
+			} catch (IOException e) {
+				log.error("Unable to close jar file {}", classesSource);
+			}
 		}
 	}
 

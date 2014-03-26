@@ -37,6 +37,45 @@ public class ClasspathScannerTests {
 	}
 
 	@Test
+	public void invalidFileTest() throws IOException {
+		ClasspathScanner.resetScannerForTesting();
+
+		File scss = new File("src/test/resources/kefeng.scss");
+		if (!scss.exists()) {
+			throw new RuntimeException("Running tests in wrong directory in IDE, update your run configuration");
+		}
+
+		log.info("Found {} should be ok", scss.getAbsolutePath());
+
+		URL[] badCp = new URL[] { scss.toURI().toURL() };
+
+		ClasspathScanner cp = new ClasspathScanner();
+
+		cp.registerResourceScanner(new ResourceScanListener() {
+			@Override
+			public List<ScanResource> resource(List<ScanResource> scanResources) throws Exception {
+				return null;
+			}
+
+			@Override
+			public void deliver(ScanResource desire, InputStream inputStream) {
+
+			}
+
+			@Override
+			public InterestAction isInteresting(InterestingResource interestingResource) {
+				return null;
+			}
+
+			@Override
+			public void scanAction(ScanAction action) {
+			}
+		} );
+
+		cp.scan(new URLClassLoader(badCp));
+	}
+
+	@Test
 	public void cpTest() throws IOException {
 		ClasspathScanner.resetScannerForTesting();
 
