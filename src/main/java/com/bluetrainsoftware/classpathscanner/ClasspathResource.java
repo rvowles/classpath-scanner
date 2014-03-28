@@ -17,6 +17,7 @@ import java.util.jar.JarFile;
 public class ClasspathResource {
 	private final static Logger log = LoggerFactory.getLogger(ClasspathResource.class);
 	private static final int MAX_RESOURCES = 3000;
+	public static final String TARGET_TEST_CLASSES = "target/test-classes".replace("/", File.separator);
 
 	/**
 	 * The original resources.
@@ -367,6 +368,6 @@ public class ClasspathResource {
 	}
 
 	public boolean isTestClasspath() {
-		return (classesSource.isDirectory() && classesSource.getAbsolutePath().endsWith("target/test-classes"));
+		return (classesSource.isDirectory() && classesSource.getAbsolutePath().endsWith(TARGET_TEST_CLASSES));
 	}
 }

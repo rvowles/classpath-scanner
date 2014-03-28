@@ -176,7 +176,7 @@ public interface ResourceScanListener {
 		}
 
 		public boolean isTestDirectory() {
-			return directory != null && directory.getPath().endsWith("/target/test-classes");
+			return directory != null && directory.getPath().endsWith(ClasspathResource.TARGET_TEST_CLASSES);
 		}
 	}
 
