@@ -18,6 +18,10 @@ public class ClasspathResource {
 	private final static Logger log = LoggerFactory.getLogger(ClasspathResource.class);
 	private static final int MAX_RESOURCES = 3000;
 	public static final String TARGET_TEST_CLASSES = "target/test-classes".replace("/", File.separator);
+	/**
+	 * IDEA sometimes leaks in Maven Parent POMS as test classes
+	 */
+	private static final String M2_REPOSITORY = "/.m2/repository".replace("/", File.separator);
 
 	/**
 	 * The original resources.
@@ -368,6 +372,6 @@ public class ClasspathResource {
 	}
 
 	public boolean isTestClasspath() {
-		return (classesSource.isDirectory() && classesSource.getAbsolutePath().endsWith(TARGET_TEST_CLASSES));
+		return (classesSource.isDirectory() && !classesSource.getAbsolutePath().contains(M2_REPOSITORY) && classesSource.getAbsolutePath().endsWith(TARGET_TEST_CLASSES));
 	}
 }
