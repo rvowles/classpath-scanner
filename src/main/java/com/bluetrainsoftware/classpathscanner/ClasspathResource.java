@@ -12,11 +12,14 @@ import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 
 /**
+ * -- Spring Loader ones look like this: jar:file:/Users/richard/java/entopix/stack-runner/target/stack-runner-1.1-SNAPSHOT.jar!/
+ * and jar:file:/Users/richard/java/entopix/stack-runner/target/stack-runner-1.1-SNAPSHOT.jar!/lib/profiler-rest-0.0.1-SNAPSHOT.jar!/
+ *
  * @author: Richard Vowles - https://plus.google.com/+RichardVowles
  */
 public class ClasspathResource {
 	private final static Logger log = LoggerFactory.getLogger(ClasspathResource.class);
-	private static final int MAX_RESOURCES = 3000;
+	public static final int MAX_RESOURCES = 3000;
 	public static final String TARGET_TEST_CLASSES = "target/test-classes".replace("/", File.separator);
 	/**
 	 * IDEA sometimes leaks in Maven Parent POMS as test classes
@@ -118,12 +121,30 @@ public class ClasspathResource {
 
 				fireFileResourceListeners(scanResources, listener);
 			}
-		} else {
+		} else if (!externalHandler(scanResources)) {
 			processJarFile(scanResources);
 		}
 	}
 
+	/**
+	 * This allows specialist classpath handlers to exist for peculiar formats - e.g. Spring Loader.
+	 *
+	 * @param scanResources - the resources to be filled in
+	 * @return true if handled
+	 */
+	protected boolean externalHandler(List<ResourceScanListener.ScanResource> scanResources) {
+		for(ClasspathScannerSpecialist specialist : ClasspathSpecialistLoader.specialists) {
+			try {
+				if (specialist.handlesClasspathResource(this, scanResources)) {
+					return true;
+				}
+			} catch (IOException e) {
+				log.error("Unable to process classpath resource {}", classesSource.getAbsolutePath(), e);
+			}
+		}
 
+		return false;
+	}
 
 	protected void processDirectory(List<ResourceScanListener.ScanResource> scanResources, File dir, String packageName, OffsetListener listener) {
 		File[] files = dir.listFiles();
@@ -199,54 +220,7 @@ public class ClasspathResource {
 		}
 
 		try {
-			Enumeration<JarEntry> entries = jf.entries();
-
-			String lastPrefix = "";
-			int offsetStrip = 0;
-			URL currentUrl = url;
-			OffsetListener offsetListener = null;
-			boolean thereAreListeners = false;
-
-			if (onlyNullJarOffset) {
-				offsetListener = jarOffsets.iterator().next();
-				thereAreListeners = offsetListener.listeners != null && offsetListener.listeners.size() > 0;
-			}
-
-			while (entries.hasMoreElements()) {
-				JarEntry entry = entries.nextElement();
-
-				if (!onlyNullJarOffset && (lastPrefix.length() == 0 || !entry.getName().startsWith(lastPrefix))) {
-					OffsetListener newOffsetListener = findOffsetListener(entry.getName());
-
-					if (newOffsetListener != offsetListener) {
-						fireListeners(scanResources, offsetListener, jf);
-
-						offsetListener = newOffsetListener;
-
-						thereAreListeners = offsetListener != null && offsetListener.listeners != null && offsetListener.listeners.size() > 0;
-
-						if (offsetListener == null) {
-							lastPrefix = "";
-
-							offsetStrip = 0;
-						} else { // files from the main war popping up at the end
-							lastPrefix = offsetListener.jarOffset;
-
-							offsetStrip = lastPrefix.length();
-						}
-					}
-
-				} else if (scanResources.size() >= MAX_RESOURCES) {
-					fireListeners(scanResources, offsetListener, jf);
-				}
-
-				if (thereAreListeners) {
-					scanResources.add(new ResourceScanListener.ScanResource(currentUrl, entry, resourceName(offsetStrip, entry.getName()), offsetListener.interestingResource.url));
-				}
-			}
-
-			// anything remaining
-			fireListeners(scanResources, offsetListener, jf);
+			extractJarEntries(scanResources, jf);
 
 
 		} finally {
@@ -256,6 +230,57 @@ public class ClasspathResource {
 				log.error("Unable to close jar file {}", classesSource);
 			}
 		}
+	}
+
+	public void extractJarEntries(List<ResourceScanListener.ScanResource> scanResources, JarFile jf) {
+		Enumeration<JarEntry> entries = jf.entries();
+
+		String lastPrefix = "";
+		int offsetStrip = 0;
+		URL currentUrl = url;
+		OffsetListener offsetListener = null;
+		boolean thereAreListeners = false;
+
+		if (onlyNullJarOffset) {
+			offsetListener = jarOffsets.iterator().next();
+			thereAreListeners = offsetListener.listeners != null && offsetListener.listeners.size() > 0;
+		}
+
+		while (entries.hasMoreElements()) {
+			JarEntry entry = entries.nextElement();
+
+			if (!onlyNullJarOffset && (lastPrefix.length() == 0 || !entry.getName().startsWith(lastPrefix))) {
+				OffsetListener newOffsetListener = findOffsetListener(entry.getName());
+
+				if (newOffsetListener != offsetListener) {
+					fireListeners(scanResources, offsetListener, jf);
+
+					offsetListener = newOffsetListener;
+
+					thereAreListeners = offsetListener != null && offsetListener.listeners != null && offsetListener.listeners.size() > 0;
+
+					if (offsetListener == null) {
+						lastPrefix = "";
+
+						offsetStrip = 0;
+					} else { // files from the main war popping up at the end
+						lastPrefix = offsetListener.jarOffset;
+
+						offsetStrip = lastPrefix.length();
+					}
+				}
+
+			} else if (scanResources.size() >= MAX_RESOURCES) {
+				fireListeners(scanResources, offsetListener, jf);
+			}
+
+			if (thereAreListeners) {
+				scanResources.add(new ResourceScanListener.ScanResource(currentUrl, entry, resourceName(offsetStrip, entry.getName()), offsetListener.interestingResource.url));
+			}
+		}
+
+		// anything remaining
+		fireListeners(scanResources, offsetListener, jf);
 	}
 
 	private String resourceName(int offsetStrip, String name) {
@@ -270,7 +295,7 @@ public class ClasspathResource {
 		return name;
 	}
 
-	private void fireListeners(List<ResourceScanListener.ScanResource> scanResources, OffsetListener offsetListener, JarFile jf) {
+	public void fireListeners(List<ResourceScanListener.ScanResource> scanResources, OffsetListener offsetListener, JarFile jf) {
 		if (scanResources.size() > 0) {
 
 			for (ListenerInterest interested : offsetListener.listeners) {
