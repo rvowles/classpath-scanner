@@ -90,10 +90,15 @@ public class ClasspathScanner {
 		return globalScanner;
 	}
 
-	public static void resetScannerForTesting() {
-		globalScanner = new ClasspathScanner();
+	public static void releaseAllResources() {
 		allUncheckedListeners = new ArrayList<>();
 		resources = new HashMap<>();
+		System.gc(); // try and force a gc, probably ignored
+	}
+
+	public static void resetScannerForTesting() {
+		globalScanner = new ClasspathScanner();
+		releaseAllResources();
 	}
 
 	public void registerResourceScanner(ResourceScanListener listener) {
